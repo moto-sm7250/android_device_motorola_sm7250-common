@@ -307,15 +307,6 @@ PRODUCT_COPY_FILES += \
 PRODUCT_PACKAGES += \
     ims-moto-libs
 
-PRODUCT_BOOT_JARS += \
-    ims-moto-libs \
-    moto-ims-ext \
-    moto-telephony
-
-PRODUCT_SYSTEM_SERVER_JARS += \
-    moto-ims-ext \
-    moto-telephony
-
 # IPACM
 PRODUCT_PACKAGES += \
     ipacm \
@@ -484,9 +475,6 @@ PRODUCT_PACKAGES += \
     qti_telephony_utils.xml \
     telephony-ext
 
-PRODUCT_BOOT_JARS += \
-    telephony-ext
-
 # Thermal
 PRODUCT_PACKAGES += \
     android.hardware.thermal@2.0-service.qti
@@ -540,6 +528,3 @@ PRODUCT_COPY_FILES += \
 PRODUCT_PACKAGES += \
     libnl \
     libwfdaac_vendor
-
-PRODUCT_BOOT_JARS += \
-    WfdCommon
