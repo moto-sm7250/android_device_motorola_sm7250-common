@@ -356,7 +356,9 @@ PRODUCT_PACKAGES += \
     android.hardware.nfc@1.2-service
 else
 PRODUCT_PACKAGES += \
-    android.hardware.nfc@1.2-service.st
+    android.hardware.secure_element@1.2.vendor \
+    android.hardware.nfc@1.2-service.st \
+    nfc_nci.st21nfc.default
 endif
 
 # OMX
