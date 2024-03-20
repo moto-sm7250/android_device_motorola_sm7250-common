@@ -34,6 +34,10 @@ vendor.boot_completed      u:object_r:moto_boot_prop:s0
 # AOV
 vendor.hw.aov.             u:object_r:vendor_aov_prop:s0
 
+# NFC
+vendor.nfc.fw_status       u:object_r:vendor_mot_nfc_prop:s0
+persist.vendor.nfc.        u:object_r:vendor_mot_nfc_prop:s0
+
 # Power
 vendor.powerhal.           u:object_r:vendor_power_prop:s0
 
