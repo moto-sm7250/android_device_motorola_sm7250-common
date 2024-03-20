@@ -135,7 +135,7 @@ PRODUCT_PACKAGES += \
     tinymix \
     libtinycompress
 
-ifneq (,$(filter %nairo, $(TARGET_PRODUCT)))
+ifneq (,$(filter %kiev, %nairo, $(TARGET_PRODUCT)))
 else
 PRODUCT_PACKAGES += \
     audio.primary.lito \
