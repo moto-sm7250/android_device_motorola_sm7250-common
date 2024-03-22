@@ -171,9 +171,9 @@ on boot
     # an ack packet comes out of order
     write /proc/sys/net/netfilter/nf_conntrack_tcp_be_liberal 1
 
-    # Set the console loglevel to < KERN_INFO
+    # Set the console loglevel to < KERN_WARN
     # Set the default message loglevel to KERN_INFO
-    write /proc/sys/kernel/printk "6 6 1 7"
+    write /proc/sys/kernel/printk "4 6 1 7"
 
     # Allow access for CCID command/response timeout configuration
     chown system system /sys/module/ccid_bridge/parameters/bulk_msg_timeout
@@ -238,7 +238,7 @@ on post-fs-data
     mkdir /data/vendor/pwr 0700 root root
 
     # Create directory used by media clients
-    mkdir /data/vendor/media 0770 mediacodec media
+    mkdir /data/vendor/media 0775 mediacodec media
 
     # Create /data/vendor/tzstorage directory for SFS listener
     mkdir /data/vendor/tzstorage 0770 system system
@@ -862,13 +862,21 @@ on property:vendor.gpu.available_frequencies=*
     setprop ro.vendor.gpu.available_frequencies ${vendor.gpu.available_frequencies}
 
 # huangzq2: GPU trubo
+on property:vendor.gpu.turbo_enabled=1
+    setprop vendor.thermal.mode perf
+    stop thermal-engine
+    start thermal-engine
+
+on property:vendor.gpu.turbo_enabled=0
+    setprop vendor.thermal.mode normal
+    stop thermal-engine
+    start thermal-engine
+
 on property:vendor.gpu.turbo_supported=1 && property:vendor.gpu.turbo_enabled=1
     write /sys/class/kgsl/kgsl-3d0/max_pwrlevel 0
-    stop thermal-engine
 
 on property:vendor.gpu.turbo_supported=1 && property:vendor.gpu.turbo_enabled=0
     write /sys/class/kgsl/kgsl-3d0/max_pwrlevel 1
-    start thermal-engine
 
 service vendor.audio-hal /vendor/bin/hw/android.hardware.audio.service
     override

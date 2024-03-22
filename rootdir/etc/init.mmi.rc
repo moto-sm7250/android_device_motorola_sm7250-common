@@ -226,7 +226,7 @@ on post-fs-data
     mkdir /data/vendor/bug2go 0770 log log
 
     # Setup folder for aplogd
-    mkdir /data/vendor/aplogd 0750 log log
+    mkdir /data/vendor/aplogd 0770 log log
 
     # Create directory used by chargeonlymode
     mkdir /data/vendor/chargeonly 0750 root log
@@ -300,6 +300,9 @@ on boot
    chown audio audio /sys/kernel/aov/trigger
    chown audio audio /sys/kernel/aov/register
    chown audio audio /sys/kernel/aov/event
+
+   # Quiet binder logs
+   write /sys/module/binder/parameters/debug_mask 0x5
 
    # Clear cooldown state
    mkdir /mnt/vendor/persist/chargeonly 0770 system system
@@ -410,11 +413,20 @@ on property:vendor.wifi.tethering=true
 # from hardware/interfaces/sensors/2.0/multihal
 # to add input and uhid group access
 service vendor.sensors-hal-2-0-multihal /vendor/bin/hw/android.hardware.sensors@2.0-service.multihal
-    override
     class hal
     user system
     group system wakelock context_hub input uhid
-    task_profiles ServiceCapacityLow
+    writepid /dev/cpuset/system-background/tasks
+    capabilities BLOCK_SUSPEND
+    rlimit rtprio 10 10
+
+# from hardware/interfaces/sensors/2.1/multihal
+# to add input and uhid group access
+service vendor.sensors-hal-2-1-multihal /vendor/bin/hw/android.hardware.sensors@2.1-service.multihal
+    class hal
+    user system
+    group system wakelock context_hub input uhid
+    writepid /dev/cpuset/system-background/tasks
     capabilities BLOCK_SUSPEND
     rlimit rtprio 10 10
 
@@ -435,8 +447,8 @@ on property:persist.sys.locale=*
 on property:ro.carrier=softbank
     setprop audio.camerasound.force true
 
-on property:ro.carrier=tmo
-    write /sys/class/power_supply/battery/device/force_max_chrg_temp 55
+on property:ro.sys.force_max_chrg_temp=*
+    write /sys/class/power_supply/battery/device/force_max_chrg_temp ${ro.sys.force_max_chrg_temp}
 
-on property:ro.carrier=metropcs
-    write /sys/class/power_supply/battery/device/force_max_chrg_temp 55
+on property:ro.sys.force_demo_mode=*
+    write /sys/class/power_supply/battery/device/force_demo_mode ${ro.sys.force_demo_mode}

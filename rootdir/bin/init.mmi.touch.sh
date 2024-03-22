@@ -27,10 +27,17 @@ dlkm_path=/vendor/lib/modules
 device_property=ro.vendor.hw.device
 hwrev_property=ro.vendor.hw.revision
 firmware_path=/vendor/firmware
+param_path=/data/vendor/param/touch
 factory_property=ro.vendor.build.motfactory
 bootmode_property=ro.bootmode
+touch_firmware_property=ro.vendor.touch.fw_version
+touch_vendor_property=ro.vendor.touch.supplier_vendor
 let dec_cfg_id_boot=0
 let dec_cfg_id_latest=0
+# Whether to search for TP firmware in the parameter path
+let search_in_param=0
+# Whether the matching TP firmware is found in the parameter path
+let find_in_param=0
 typeset -l product_id
 panel_ver=
 supplier=
@@ -190,9 +197,9 @@ setup_permissions()
 			  samsung)	key_path="/sys/devices/virtual/sec/sec_ts/"
 						key_files=$(ls $key_path 2>/dev/null)
 						# Set optional permissions to LSI touch tests
-						[ -f $touch_path/size ] && chown root:oem_5004 $touch_path/size
-						[ -f $touch_path/address ] && chown root:oem_5004 $touch_path/address
-						[ -f $touch_path/write ] && chown root:oem_5004 $touch_path/write
+						[ -f $touch_path/size ] && chown root:vendor_tcmd $touch_path/size
+						[ -f $touch_path/address ] && chown root:vendor_tcmd $touch_path/address
+						[ -f $touch_path/write ] && chown root:vendor_tcmd $touch_path/write
 						;;
 			synaptics)	key_path=$touch_path
 						key_files=$(prepend f54 `ls $touch_path/f54/ 2>/dev/null`)
@@ -208,6 +215,11 @@ setup_permissions()
 							key_files="gtp_tools"
 						fi
 						;;
+			   stmicro)	key_path="/proc/fts/"
+						key_files="driver_test"
+						# Set optional permissions to LSI touch tests
+						[ -f $touch_path/calibrate ] && chown root:vendor_tcmd $touch_path/calibrate
+						;;
 		esac
 		for entry in $key_files; do
 			chmod 0666 $key_path/$entry
@@ -215,14 +227,14 @@ setup_permissions()
 		done
 	fi
 	# Set permissions to enable factory touch tests
-	chown root:oem_5004 $touch_path/drv_irq
-	chown root:oem_5004 $touch_path/hw_irqstat
-	chown root:oem_5004 $touch_path/reset
+	chown root:vendor_tcmd $touch_path/drv_irq
+	chown root:vendor_tcmd $touch_path/hw_irqstat
+	chown root:vendor_tcmd $touch_path/reset
 
 	# Set permissions to allow Bug2Go access to touch statistics
 	chown root:log $touch_path/stats
 	# Erase is optional
-	[ -f $touch_path/erase_all ] && chown root:oem_5004 $touch_path/erase_all
+	[ -f $touch_path/erase_all ] && chown root:vendor_tcmd $touch_path/erase_all
 }
 
 read_touch_property()
@@ -276,6 +288,11 @@ find_best_match()
 	local hw_mask=$1
 	local panel_supplier=$2
 	local skip_fields fw_mask
+	local match_best_cfg
+	local match_best_cfg_dec param_cfg_dec
+	let match_best_cfg_dec=0
+	let param_cfg_dec=0
+
 	while [ ! -z "$hw_mask" ]; do
 		if [ "$hw_mask" == "-" ]; then
 			hw_mask=""
@@ -287,10 +304,32 @@ find_best_match()
 			skip_fields=2
 			fw_mask="$touch_vendor-$touch_product_id-*-$product_id$hw_mask.*"
 		fi
-		find_latest_config_id "$fw_mask" "$skip_fields" && break
+		find_latest_config_id "$fw_mask" "$skip_fields"
+		if [ "$?" == "0" ]; then
+			let match_best_cfg_dec=$dec_cfg_id_latest
+			match_best_cfg=$str_cfg_id_latest
+		fi
+		if [ "$search_in_param" == "1" ]; then
+			cd $param_path
+			find_latest_config_id "$fw_mask" "$skip_fields"
+			if [ "$?" == "0" ]; then
+				if [ $match_best_cfg_dec -lt $dec_cfg_id_latest ]; then
+					let match_best_cfg_dec=$dec_cfg_id_latest
+					match_best_cfg=$str_cfg_id_latest
+					let find_in_param=1
+				else
+					cd $firmware_path
+				fi
+			else
+					cd $firmware_path
+			fi
+		fi
+		[ $match_best_cfg_dec != 0 ] && break
 		hw_mask=${hw_mask%?}
 	done
-	[ -z "$str_cfg_id_latest" ] && return 1
+	str_cfg_id_latest=$match_best_cfg
+	dec_cfg_id_latest=$match_best_cfg_dec
+	[ -z "$match_best_cfg" ] && return 1
 	if [ -z "$panel_supplier" ]; then
 		firmware_file=$(ls $touch_vendor-$touch_product_id-$str_cfg_id_latest-*-$product_id$hw_mask.*)
 	else
@@ -339,6 +378,8 @@ query_panel_info()
 		read_panel_property "controller_drv_ver"
 		panel_ver=${property#${property%?}}
 		debug "panel supplier: $supplier, ver $panel_ver"
+		setprop $touch_vendor_property "$supplier-$touch_vendor"
+		notice "touch_vendor_property = $touch_vendor_property, $supplier-$touch_vendor"
 	else
 		debug "driver does not report panel supplier"
 	fi
@@ -416,6 +457,13 @@ run_firmware_upgrade()
 		debug "forcing firmware upgrade"
 		echo 1 > $touch_path/forcereflash
 		debug "sending reflash command"
+		if [ "$find_in_param" == "1" ]; then
+			notice "Start touchUpg service, upgrade tp firmware parameters"
+			echo 1 > $touch_path/flash_mode
+			start vendor.touchUpg
+		else
+			echo 0 > $touch_path/flash_mode
+		fi
 		echo $firmware_file > $touch_path/doreflash
 		read_touch_property flashprog
 		if [ "$?" != "0" ]; then
@@ -523,6 +571,11 @@ process_touch_instance()
 	if [ $dump_statistics ]; then
 		dump_statistics
 	fi
+	if [ -f $touch_path/flash_mode ]; then
+		notice "Support parameter APK for FW upgrade"
+		let search_in_param=1
+	fi
+
 	notice "Checking touch ID [$touch_instance] FW upgrade"
 	touch_vendor=$(cat $touch_class_path/$touch_instance/vendor)
 	debug "touch vendor [$touch_vendor]"
@@ -539,7 +592,10 @@ process_touch_instance()
 		notice "property [$touch_status_prop] set to [`getprop $touch_status_prop`]"
 		notice "Handling touch ID [$touch_instance] permissions"
 	fi
-	#setup_permissions
+	read_touch_property buildid
+	setprop $touch_firmware_property ${property}
+	notice "Touch firmware property is $touch_firmware_property"
+	setup_permissions
 }
 
 # Main starts here
