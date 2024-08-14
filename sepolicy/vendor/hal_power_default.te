@@ -4,6 +4,8 @@ allow hal_power_default {
 }:dir search;
 
 allow hal_power_default {
+  proc
+  proc_sched
   sysfs_msm_subsys
   vendor_sysfs_sensors
 }:{
